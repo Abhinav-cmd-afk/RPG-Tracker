@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RPG Tracker</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #121212; --surface: #1e1e1e; --primary: #bb86fc;
+            --secondary: #03dac6; --error: #cf6679; --text: #e0e0e0;
+            --text-muted: #888; --border: #333; --abandoned: #555;
+            --study: #ff9800; --focus: #2196f3; --health: #4caf50; --utility: #9e9e9e;
+        }
+        [data-theme="abyssal"] {
+            --bg: #000000; --surface: #0a0a1a; --primary: #ff1744;
+            --secondary: #00e676; --text: #ffffff; --border: #1f1f3a;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding-bottom: 70px; transition: background 0.3s; }
+        
+        /* Top Bar & XP */
+        header { background: var(--surface); padding: 15px; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 100; }
+        .stats-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .level-badge { background: var(--primary); color: #000; padding: 5px 10px; border-radius: 8px; font-weight: bold; }
+        .title-display { font-size: 1.1rem; font-weight: bold; color: var(--secondary); text-align: right; }
+        .xp-bar-container { width: 100%; height: 12px; background: #333; border-radius: 6px; overflow: hidden; position: relative; }
+        .xp-bar-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.4s ease-out; }
+        .xp-text { position: absolute; width: 100%; text-align: center; font-size: 0.65rem; top: 0; color: #fff; font-weight: bold; line-height: 12px; }
+        .streak-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 8px; color: var(--text-muted); }
+
+        /* Navigation */
+        nav { position: fixed; bottom: 0; width: 100%; background: var(--surface); display: flex; border-top: 2px solid var(--border); z-index: 100; }
+        .nav-btn { flex: 1; padding: 15px 0; background: none; border: none; color: var(--text-muted); font-weight: bold; font-size: 0.8rem; cursor: pointer; }
+        .nav-btn.active { color: var(--primary); border-top: 2px solid var(--primary); }
+
+        /* Containers */
+        .tab-content { display: none; padding: 15px; }
+        .tab-content.active { display: block; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Forms */
+        .input-card { background: var(--surface); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border); }
+        input, select { width: 100%; padding: 10px; margin: 5px 0 15px; background: #2a2a2a; border: 1px solid var(--border); color: var(--text); border-radius: 6px; }
+        .checkbox-row { display: flex; gap: 15px; margin-bottom: 15px; align-items: center; font-size: 0.9rem; }
+        .btn-primary { width: 100%; background: var(--primary); color: #000; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
+        /* Tasks */
+        .task-list { display: flex; flex-direction: column; gap: 10px; }
+        .task-card { background: var(--surface); padding: 12px; border-radius: 10px; border-left: 4px solid var(--primary); display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden; }
+        .task-card.abandoned { border-color: var(--abandoned); opacity: 0.6; }
+        .task-info { flex: 1; }
+        .task-title { font-size: 1rem; font-weight: bold; margin-bottom: 4px; transition: all 0.3s; }
+        .task-card.completed .task-title { text-decoration: line-through; color: var(--text-muted); }
+        .task-note { font-size: 0.75rem; color: var(--text-muted); }
+        .task-meta { font-size: 0.7rem; color: var(--secondary); margin-top: 4px; display: flex; gap: 10px; }
+        
+        /* Action Buttons */
+        .actions { display: flex; gap: 8px; align-items: center; }
+        .action-btn { background: #333; border: none; color: white; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+        .btn-complete { background: var(--health); color: #000; font-weight: bold; position: relative; }
+        .btn-abandon { background: var(--error); color: #000; }
+        .btn-dismiss { background: var(--text-muted); color: #000; }
+
+        /* Long Press Ring */
+        .progress-ring { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: rgba(255,255,255,0.2); pointer-events: none; }
+
+        /* Habits */
+        .habit-card { background: var(--surface); padding: 12px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .habit-actions button { width: 40px; height: 40px; border-radius: 50%; border: none; font-size: 1.2rem; font-weight: bold; margin-left: 10px; cursor: pointer; }
+        .btn-pos { background: var(--health); color: #000; }
+        .btn-neg { background: var(--error); color: #000; }
+
+        /* Modals */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; justify-content: center; align-items: center; }
+        .modal-content { background: var(--surface); padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; }
+        
+        .cat-study { color: var(--study); } .cat-focus { color: var(--focus); }
+        .cat-health { color: var(--health); } .cat-utility { color: var(--utility); }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="stats-row">
+            <div class="level-badge" id="levelDisplay">Lvl 1</div>
+            <div class="title-display" id="titleDisplay">Novice</div>
+        </div>
+        <div class="xp-bar-container">
+            <div class="xp-bar-fill" id="xpBar"></div>
+            <div class="xp-text" id="xpText">0 / 100 XP</div>
+        </div>
+        <div class="streak-row">
+            <span>🔥 Streak: <span id="streakCount">0</span> <span id="streakMultiplier" style="color:var(--secondary)"></span></span>
+            <span>🛡️ Shields: <span id="shieldCount">0</span></span>
+        </div>
+    </header>
+
+    <nav>
+        <button class="nav-btn active" onclick="switchTab('tasks')">Tasks</button>
+        <button class="nav-btn" onclick="switchTab('habits')">Habits</button>
+        <button class="nav-btn" onclick="switchTab('analytics')">Stats</button>
+        <button class="nav-btn" onclick="switchTab('graveyard')">Graveyard</button>
+        <button class="nav-btn" onclick="switchTab('settings')">Settings</button>
+    </nav>
+
+    <main id="tasks" class="tab-content active">
+        <div class="input-card">
+            <input type="date" id="taskDate" onchange="renderTasks()">
+            <input type="text" id="taskTitle" placeholder="What needs to be done?" autocomplete="off">
+            <input type="text" id="taskNote" placeholder="Notes (Optional)" autocomplete="off">
+            <div style="display: flex; gap: 10px;">
+                <select id="taskCategory">
+                    <option value="Study">Study (Intelligence)</option>
+                    <option value="Focus">Focus (Willpower)</option>
+                    <option value="Health">Health (Vitality)</option>
+                    <option value="Utility">Utility (Others)</option>
+                </select>
+                <select id="taskDifficulty">
+                    <option value="Trivial">Trivial (10 XP)</option>
+                    <option value="Easy">Easy (25 XP)</option>
+                    <option value="Medium">Medium (50 XP)</option>
+                    <option value="Hard">Hard (100 XP)</option>
+                    <option value="Nightmare">Nightmare (250 XP)</option>
+                </select>
+            </div>
+            <div class="checkbox-row">
+                <label><input type="checkbox" id="taskDaily"> Daily Respawn</label>
+                <label><input type="checkbox" id="taskBoss"> 💀 Boss Fight (x5 XP)</label>
+            </div>
+            <button class="btn-primary" onclick="addTask()">Add Task</button>
+        </div>
+        <div id="taskList" class="task-list"></div>
+    </main>
+
+    <main id="habits" class="tab-content">
+        <div class="input-card">
+            <input type="text" id="habitTitle" placeholder="Habit to build or break">
+            <select id="habitCategory">
+                <option value="Focus">Focus</option><option value="Study">Study</option>
+                <option value="Health">Health</option><option value="Utility">Utility</option>
+            </select>
+            <button class="btn-primary" onclick="addHabit()">Add Habit</button>
+        </div>
+        <div id="habitList" class="task-list"></div>
+    </main>
+
+    <main id="analytics" class="tab-content">
+        <div class="input-card">
+            <h3 style="margin-bottom: 10px;">XP Distribution</h3>
+            <canvas id="xpChart" height="200"></canvas>
+        </div>
+        <div class="input-card" id="lifetimeStats"></div>
+    </main>
+
+    <main id="graveyard" class="tab-content">
+        <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 0.85rem;">Reflect on the tasks you abandoned. Honesty fuels growth.</p>
+        <div id="graveyardList" class="task-list"></div>
+    </main>
+
+    <main id="settings" class="tab-content">
+        <div class="input-card">
+            <h3>Data Management</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 10px 0;">Export your save file before updating versions.</p>
+            <button class="btn-primary" onclick="exportData()" style="margin-bottom: 10px;">Export Save File (.json)</button>
+            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
+            <button class="btn-primary" onclick="document.getElementById('importFile').click()" style="background: var(--utility);">Import Save File</button>
+        </div>
+        <div class="input-card">
+            <h3>Theme</h3>
+            <select id="themeSelect" onchange="changeTheme()">
+                <option value="dark">Standard Dark</option>
+                <option value="abyssal">Abyssal (High Contrast)</option>
+            </select>
+        </div>
+    </main>
+
+    <div id="abandonModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: var(--error); margin-bottom: 10px;">Abandon Task</h3>
+            <p style="font-size: 0.85rem; margin-bottom: 15px;">Why are you skipping this? Be honest.</p>
+            <input type="text" id="abandonReason" placeholder="Reason...">
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-primary" style="background: var(--text-muted);" onclick="closeModal('abandonModal')">Cancel</button>
+                <button class="btn-primary" style="background: var(--error);" onclick="confirmAbandon()">Abandon</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // RPG Configuration
+        const XP_VALUES = { 'Trivial': 10, 'Easy': 25, 'Medium': 50, 'Hard': 100, 'Nightmare': 250 };
+        const TITLES = [
+            "Initiate", "Novice", "Apprentice", "Acolyte", "Neophyte", "Journeyman", "Seeker", 
+            "Scholar", "Adept", "Wanderer", "Pathfinder", "Vanguard", "Sentinel", "Guardian",
+            "Knight", "Elite", "Master", "Grandmaster", "Sage", "Oracle", "Luminary", 
+            "Archon", "Paragon", "Legend", "Mythic", "Immortal", "Demigod", "Astral Sovereign"
+        ];
+        
+        // State Management
+        let state = {
+            xp: 0, level: 1, streak: 0, negativeStreak: 0, shields: 0,
+            tasks: [], habits: [], graveyard: [],
+            stats: { Study: 0, Focus: 0, Health: 0, Utility: 0, TotalTasks: 0 },
+            lastLoginDate: new Date().toISOString().split('T')[0]
+        };
+
+        let currentAbandonId = null;
+        let pressTimer;
+
+        // Initialization
+        window.onload = () => {
+            const saved = localStorage.getItem('rpgTrackerState');
+            if (saved) state = JSON.parse(saved);
+            
+            document.getElementById('taskDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('themeSelect').value = localStorage.getItem('rpgTheme') || 'dark';
+            changeTheme();
+            
+            midnightCheck();
+            updateUI();
+            initChart();
+        };
+
+        function saveState() {
+            localStorage.setItem('rpgTrackerState', JSON.stringify(state));
+            updateUI();
+        }
+
+        // Web Audio Ding
+        function playDing() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.02);
+            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.15);
+            osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.15);
+        }
+
+        // Core UI
+        function updateUI() {
+            const xpReq = getXPReq(state.level);
+            document.getElementById('levelDisplay').innerText = `Lvl ${state.level}`;
+            document.getElementById('titleDisplay').innerText = getTitle(state.level);
+            document.getElementById('xpText').innerText = `${Math.floor(state.xp)} / ${xpReq} XP`;
+            document.getElementById('xpBar').style.width = `${Math.min(100, (state.xp / xpReq) * 100)}%`;
+            document.getElementById('streakCount').innerText = state.streak;
+            document.getElementById('shieldCount').innerText = state.shields;
+            
+            let multi = state.streak > 0 ? (1 + Math.min(state.streak * 0.05, 0.5)).toFixed(2) : 1;
+            document.getElementById('streakMultiplier').innerText = state.streak > 0 ? `(x${multi})` : '';
+
+            renderTasks();
+            renderHabits();
+            renderGraveyard();
+        }
+
+        function getXPReq(lvl) { return Math.floor(100 * Math.pow(1.15, lvl - 1)); }
+        
+        function getTitle(lvl) {
+            if(lvl <= 10) return TITLES[Math.floor((lvl-1)/1)];
+            if(lvl <= 30) return TITLES[Math.min(10 + Math.floor((lvl-11)/3), 26)];
+            return TITLES[Math.min(17 + Math.floor((lvl-31)/10), 27)];
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+            if(tabId === 'analytics') initChart();
+        }
+
+        function changeTheme() {
+            const theme = document.getElementById('themeSelect').value;
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('rpgTheme', theme);
+        }
+
+        // XP & Leveling Logic
+        function addXP(amount, cat) {
+            const multi = state.streak > 0 ? 1 + Math.min(state.streak * 0.05, 0.5) : 1;
+            const finalXP = amount * multi;
+            state.xp += finalXP;
+            state.stats[cat] += finalXP;
+            
+            while (state.xp >= getXPReq(state.level)) {
+                state.xp -= getXPReq(state.level);
+                state.level++;
+                state.shields++;
+            }
+            saveState();
+        }
+
+        function removeXP(amount) {
+            state.xp -= amount;
+            if (state.xp < 0) state.xp = 0; // Level Floor protection
+            saveState();
+        }
+
+        // Tasks Logic
+        function addTask() {
+            const title = document.getElementById('taskTitle').value;
+            if(!title) return;
+            const task = {
+                id: Date.now(),
+                date: document.getElementById('taskDate').value,
+                title,
+                note: document.getElementById('taskNote').value,
+                cat: document.getElementById('taskCategory').value,
+                diff: document.getElementById('taskDifficulty').value,
+                daily: document.getElementById('taskDaily').checked,
+                boss: document.getElementById('taskBoss').checked,
+                completed: false, abandoned: false
+            };
+            state.tasks.push(task);
+            document.getElementById('taskTitle').value = '';
+            document.getElementById('taskNote').value = '';
+            saveState();
+        }
+
+        function renderTasks() {
+            const list = document.getElementById('taskList');
+            const targetDate = document.getElementById('taskDate').value;
+            list.innerHTML = '';
+            
+            const dayTasks = state.tasks.filter(t => t.date === targetDate && !t.abandoned);
+            
+            dayTasks.forEach(task => {
+                const xpBase = XP_VALUES[task.diff] * (task.boss ? 5 : 1);
+                const isHeavy = task.diff === 'Hard' || task.diff === 'Nightmare';
+                
+                let actionHTML = '';
+                if (task.completed) {
+                    actionHTML = `<button class="action-btn" onclick="undoTask(${task.id}, ${xpBase})">Undo</button>`;
+                } else {
+                    actionHTML = `
+                        <button class="action-btn btn-dismiss" onclick="dismissTask(${task.id})">Dismiss</button>
+                        <button class="action-btn btn-abandon" onclick="openAbandon(${task.id})">Abandon</button>
+                        <button class="action-btn btn-complete" 
+                            ${isHeavy ? `onmousedown="startLongPress(${task.id}, ${xpBase}, '${task.cat}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress(${task.id}, ${xpBase}, '${task.cat}')" ontouchend="cancelLongPress()"` : `onclick="completeTask(${task.id}, ${xpBase}, '${task.cat}')"`}>
+                            <div class="progress-ring" id="ring-${task.id}"></div>
+                            Check
+                        </button>`;
+                }
+
+                list.innerHTML += `
+                    <div class="task-card ${task.completed ? 'completed' : ''}" style="border-color: var(--${task.cat.toLowerCase()})">
+                        <div class="task-info">
+                            <div class="task-title">${task.title}</div>
+                            ${task.note ? `<div class="task-note">${task.note}</div>` : ''}
+                            <div class="task-meta">
+                                <span class="cat-${task.cat.toLowerCase()}">${task.cat}</span> | 
+                                <span>${task.diff} ${task.boss ? '(BOSS)' : ''}</span> | 
+                                <span>${xpBase} XP</span>
+                            </div>
+                        </div>
+                        <div class="actions">${actionHTML}</div>
+                    </div>`;
+            });
+        }
+
+        function completeTask(id, xpBase, cat) {
+            const task = state.tasks.find(t => t.id === id);
+            task.completed = true;
+            state.stats.TotalTasks++;
+            addXP(xpBase, cat);
+            playDing();
+            checkDailyCompletion(task.date);
+        }
+
+        function undoTask(id, xpBase) {
+            const task = state.tasks.find(t => t.id === id);
+            task.completed = false;
+            state.stats.TotalTasks--;
+            removeXP(xpBase);
+        }
+
+        function dismissTask(id) {
+            state.tasks = state.tasks.filter(t => t.id !== id);
+            saveState();
+        }
+
+        // Long Press Mechanic
+        function startLongPress(id, xpBase, cat) {
+            const ring = document.getElementById(`ring-${id}`);
+            ring.style.transition = 'width 3s linear';
+            ring.style.width = '100%';
+            pressTimer = setTimeout(() => { completeTask(id, xpBase, cat); }, 3000);
+        }
+        function cancelLongPress() {
+            clearTimeout(pressTimer);
+            document.querySelectorAll('.progress-ring').forEach(r => {
+                r.style.transition = 'none'; r.style.width = '0%';
+            });
+        }
+
+        // Abandon System
+        function openAbandon(id) {
+            currentAbandonId = id;
+            document.getElementById('abandonReason').value = '';
+            document.getElementById('abandonModal').style.display = 'flex';
+        }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function confirmAbandon() {
+            const reason = document.getElementById('abandonReason').value || 'No reason provided.';
+            const task = state.tasks.find(t => t.id === currentAbandonId);
+            task.abandoned = true;
+            state.graveyard.push({ ...task, reason, abandonedDate: new Date().toISOString().split('T')[0] });
+            closeModal('abandonModal');
+            saveState();
+        }
+
+        function renderGraveyard() {
+            const list = document.getElementById('graveyardList');
+            list.innerHTML = state.graveyard.slice().reverse().map(t => `
+                <div class="task-card abandoned">
+                    <div class="task-info">
+                        <div class="task-title" style="color:var(--error)">${t.title}</div>
+                        <div class="task-note">"${t.reason}"</div>
+                        <div class="task-meta">${t.abandonedDate} | ${t.cat}</div>
+                    </div>
+                </div>`).join('');
+        }
+
+        // Habits System
+        function addHabit() {
+            const title = document.getElementById('habitTitle').value;
+            if(!title) return;
+            state.habits.push({ id: Date.now(), title, cat: document.getElementById('habitCategory').value, streak: 0 });
+            document.getElementById('habitTitle').value = '';
+            saveState();
+        }
+        
+        function renderHabits() {
+            const list = document.getElementById('habitList');
+            list.innerHTML = state.habits.map(h => `
+                <div class="habit-card" style="border-left: 4px solid var(--${h.cat.toLowerCase()})">
+                    <div>
+                        <div class="task-title">${h.title}</div>
+                        <div class="task-meta">Streak: ${h.streak} | ${h.cat}</div>
+                    </div>
+                    <div class="habit-actions">
+                        <button class="btn-pos" onclick="habitAction(${h.id}, true)">+</button>
+                        <button class="btn-neg" onclick="habitAction(${h.id}, false)">-</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function habitAction(id, isPos) {
+            if(!confirm(`Are you sure you want to mark this habit as ${isPos ? 'Positive' : 'Negative'}?`)) return;
+            const habit = state.habits.find(h => h.id === id);
+            if(isPos) {
+                habit.streak++;
+                addXP(15, habit.cat);
+                playDing();
+            } else {
+                habit.streak = 0;
+                removeXP(50); // Moderate penalty
+            }
+            saveState();
+        }
+
+        // Midnight & Streak Logic
+        function checkDailyCompletion(dateStr) {
+            const dayTasks = state.tasks.filter(t => t.date === dateStr && !t.abandoned);
+            if(dayTasks.length > 0 && dayTasks.every(t => t.completed)) {
+                if(dateStr === new Date().toISOString().split('T')[0]) {
+                    state.streak++;
+                    state.negativeStreak = 0;
+                    saveState();
+                }
+            }
+        }
+
+        function midnightCheck() {
+            const today = new Date().toISOString().split('T')[0];
+            if (state.lastLoginDate !== today) {
+                // Determine if yesterday was completed
+                const yTasks = state.tasks.filter(t => t.date === state.lastLoginDate && !t.abandoned);
+                const failed = yTasks.some(t => !t.completed);
+                
+                if (failed) {
+                    if (state.streak >= 5 && state.shields > 0) {
+                        if(confirm(`Your ${state.streak}-day streak broke yesterday! Use 1 Shield to save it?`)) {
+                            state.shields--;
+                        } else { applyStreakBreak(); }
+                    } else { applyStreakBreak(); }
+                }
+
+                // Respawn Dailies
+                state.tasks.filter(t => t.daily).forEach(t => {
+                    if (!state.tasks.find(nt => nt.title === t.title && nt.date === today)) {
+                        state.tasks.push({ ...t, id: Date.now() + Math.random(), date: today, completed: false, abandoned: false });
+                    }
+                });
+                
+                state.lastLoginDate = today;
+                saveState();
+            }
+        }
+
+        function applyStreakBreak() {
+            state.streak = 0;
+            state.negativeStreak++;
+            if(state.negativeStreak >= 3) {
+                // Apply flat penalty for unfinished heavy tasks
+                const yTasks = state.tasks.filter(t => t.date === state.lastLoginDate && !t.completed && !t.abandoned);
+                yTasks.forEach(t => removeXP(XP_VALUES[t.diff] * 0.5));
+            }
+        }
+
+        // Data Management
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `rpg_tracker_v1_${new Date().getTime()}.json`);
+            dlAnchorElem.click();
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                state = JSON.parse(e.target.result);
+                saveState();
+                alert("Data imported successfully!");
+            };
+            reader.readAsText(file);
+        }
+
+        // Analytics (Chart.js)
+        let xpChart;
+        function initChart() {
+            document.getElementById('lifetimeStats').innerHTML = `
+                <h3>Lifetime Mastery</h3>
+                <p>Total Tasks Crushed: <strong>${state.stats.TotalTasks}</strong></p>
+            `;
+            const ctx = document.getElementById('xpChart').getContext('2d');
+            if(xpChart) xpChart.destroy();
+            xpChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Intelligence (Study)', 'Willpower (Focus)', 'Vitality (Health)', 'Utility'],
+                    datasets: [{
+                        data: [state.stats.Study, state.stats.Focus, state.stats.Health, state.stats.Utility],
+                        backgroundColor: ['#ff9800', '#2196f3', '#4caf50', '#9e9e9e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { plugins: { legend: { position: 'bottom', labels: { color: 'var(--text)' } } } }
+            });
+        }
+    </script>
+</body>
+</html>
