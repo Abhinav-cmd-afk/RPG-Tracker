@@ -1,565 +1,616 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RPG Tracker</title>
-    <link rel="manifest" href="manifest.json">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root {
-            --bg: #121212; --surface: #1e1e1e; --primary: #bb86fc;
-            --secondary: #03dac6; --error: #cf6679; --text: #e0e0e0;
-            --text-muted: #888; --border: #333; --abandoned: #555;
-            --study: #ff9800; --focus: #2196f3; --health: #4caf50; --utility: #9e9e9e;
-        }
-        [data-theme="abyssal"] {
-            --bg: #000000; --surface: #0a0a1a; --primary: #ff1744;
-            --secondary: #00e676; --text: #ffffff; --border: #1f1f3a;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: var(--bg); color: var(--text); padding-bottom: 70px; transition: background 0.3s; }
-        
-        /* Top Bar & XP */
-        header { background: var(--surface); padding: 15px; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 100; }
-        .stats-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .level-badge { background: var(--primary); color: #000; padding: 5px 10px; border-radius: 8px; font-weight: bold; }
-        .title-display { font-size: 1.1rem; font-weight: bold; color: var(--secondary); text-align: right; }
-        .xp-bar-container { width: 100%; height: 12px; background: #333; border-radius: 6px; overflow: hidden; position: relative; }
-        .xp-bar-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.4s ease-out; }
-        .xp-text { position: absolute; width: 100%; text-align: center; font-size: 0.65rem; top: 0; color: #fff; font-weight: bold; line-height: 12px; }
-        .streak-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 8px; color: var(--text-muted); }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>RPG Taskboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --bg:#0e0f11; --surface:#16181c; --surface2:#1e2026; --border:#2a2d35;
+  --accent:#7fff6e; --accent-dim:#4db84424; --accent2:#ff8c42;
+  --text:#e8eaf0; --muted:#6b7080; --danger:#ff5f57; --done-bg:#1a2018;
+  --study: #6c8fff; --focus: #4dd0e1; --health: #7fff6e; --utility: #c77dff;
+}
 
-        /* Navigation */
-        nav { position: fixed; bottom: 0; width: 100%; background: var(--surface); display: flex; border-top: 2px solid var(--border); z-index: 100; }
-        .nav-btn { flex: 1; padding: 15px 0; background: none; border: none; color: var(--text-muted); font-weight: bold; font-size: 0.8rem; cursor: pointer; }
-        .nav-btn.active { color: var(--primary); border-top: 2px solid var(--primary); }
+[data-theme="abyssal"] {
+  --bg:#05000a; --surface:#0f001a; --surface2:#1a002a; --border:#330044;
+  --accent:#ff1744; --accent-dim:#ff174424; --accent2:#b00020;
+  --text:#ffe5ec; --muted:#996688; --danger:#ff5f57; --done-bg:#2a0011;
+  --study: #ff3366; --focus: #ff1744; --health: #d50000; --utility: #ff80ab;
+}
 
-        /* Containers */
-        .tab-content { display: none; padding: 15px; }
-        .tab-content.active { display: block; animation: fadeIn 0.2s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+[data-theme="slime"] {
+  --bg:#00101a; --surface:#001c2e; --surface2:#002942; --border:#004066;
+  --accent:#00e5ff; --accent-dim:#00e5ff24; --accent2:#00b0ff;
+  --text:#e0f7fa; --muted:#5c8a99; --danger:#ff5f57; --done-bg:#002b33;
+  --study: #29b6f6; --focus: #00e5ff; --health: #69f0ae; --utility: #7c4dff;
+}
 
-        /* Forms */
-        .input-card { background: var(--surface); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border); }
-        input, select { width: 100%; padding: 10px; margin: 5px 0 15px; background: #2a2a2a; border: 1px solid var(--border); color: var(--text); border-radius: 6px; }
-        .checkbox-row { display: flex; gap: 15px; margin-bottom: 15px; align-items: center; font-size: 0.9rem; }
-        .btn-primary { width: 100%; background: var(--primary); color: #000; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
 
-        /* Tasks */
-        .task-list { display: flex; flex-direction: column; gap: 10px; }
-        .task-card { background: var(--surface); padding: 12px; border-radius: 10px; border-left: 4px solid var(--primary); display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden; }
-        .task-card.abandoned { border-color: var(--abandoned); opacity: 0.6; }
-        .task-info { flex: 1; }
-        .task-title { font-size: 1rem; font-weight: bold; margin-bottom: 4px; transition: all 0.3s; }
-        .task-card.completed .task-title { text-decoration: line-through; color: var(--text-muted); }
-        .task-note { font-size: 0.75rem; color: var(--text-muted); }
-        .task-meta { font-size: 0.7rem; color: var(--secondary); margin-top: 4px; display: flex; gap: 10px; }
-        
-        /* Action Buttons */
-        .actions { display: flex; gap: 8px; align-items: center; }
-        .action-btn { background: #333; border: none; color: white; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
-        .btn-complete { background: var(--health); color: #000; font-weight: bold; position: relative; }
-        .btn-abandon { background: var(--error); color: #000; }
-        .btn-dismiss { background: var(--text-muted); color: #000; }
+/* HEADER */
+header{
+  display:flex;align-items:center;gap:14px;
+  padding:13px 26px;border-bottom:1px solid var(--border);
+  background:var(--surface);position:sticky;top:0;z-index:100;
+  flex-wrap:wrap;
+}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;letter-spacing:-0.03em;color:var(--accent);white-space:nowrap;}
+.logo span{color:var(--text);}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);flex-shrink:0;}
 
-        /* Long Press Ring */
-        .progress-ring { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: rgba(255,255,255,0.2); pointer-events: none; }
+/* LEVEL BAR */
+.level-bar{flex:1;display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 13px;min-width:0;}
+.tag-badge{font-family:'Syne',sans-serif;font-weight:700;font-size:0.74rem;padding:3px 10px;border-radius:99px;white-space:nowrap;flex-shrink:0; background: #1a1a1a; color: var(--accent); border: 1px solid var(--accent);}
+.level-info{font-family:'DM Mono',monospace;font-size:0.71rem;color:var(--muted);white-space:nowrap;flex-shrink:0;}
+.level-info span{color:var(--text); font-weight: bold;}
+.xp-bar-wrap{flex:1;min-width:60px;}
+.xp-bar-bg{background:var(--border);border-radius:99px;height:5px;overflow:hidden;}
+.xp-bar-fill{height:100%;border-radius:99px;background:var(--accent);box-shadow:0 0 8px var(--accent);transition:width 0.5s cubic-bezier(.4,0,.2,1);}
+.xp-label{font-family:'DM Mono',monospace;font-size:0.64rem;color:var(--muted);margin-top:3px;text-align:right;}
+.shield-badge{font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);background:var(--surface2);padding:4px 10px;border-radius:6px;border:1px solid var(--border);white-space:nowrap;}
 
-        /* Habits */
-        .habit-card { background: var(--surface); padding: 12px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .habit-actions button { width: 40px; height: 40px; border-radius: 50%; border: none; font-size: 1.2rem; font-weight: bold; margin-left: 10px; cursor: pointer; }
-        .btn-pos { background: var(--health); color: #000; }
-        .btn-neg { background: var(--error); color: #000; }
+/* LAYOUT */
+.main{display:grid;grid-template-columns:1fr 340px;height:calc(100vh - 67px);overflow:hidden;}
+.left-panel{padding:22px 26px;overflow-y:auto;border-right:1px solid var(--border);}
+.right-panel{padding:22px 20px;overflow-y:auto;background:var(--surface); display:flex; flex-direction:column; gap: 20px;}
 
-        /* Modals */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; justify-content: center; align-items: center; }
-        .modal-content { background: var(--surface); padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; }
-        
-        .cat-study { color: var(--study); } .cat-focus { color: var(--focus); }
-        .cat-health { color: var(--health); } .cat-utility { color: var(--utility); }
+/* TABS */
+.tab-nav{display:flex;gap:10px;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px;overflow-x:auto;}
+.tab-btn{background:none;border:none;color:var(--muted);font-family:'Syne',sans-serif;font-weight:700;font-size:0.9rem;cursor:pointer;padding:5px 10px;transition:0.2s;white-space:nowrap;}
+.tab-btn.active{color:var(--accent);border-bottom:2px solid var(--accent);}
+.tab-content{display:none; animation: slideIn 0.2s ease;}
+.tab-content.active{display:block;}
 
-    </style>
+/* STATUS BAR */
+.status-bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.status-chip{font-family:'DM Mono',monospace;font-size:0.67rem;padding:3px 10px;border-radius:99px;border:1px solid;display:flex;align-items:center;gap:5px;}
+
+/* DATE NAV */
+.date-nav{display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+.date-nav button{background:var(--surface2);border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all 0.15s;}
+.date-nav button:hover{border-color:var(--accent);color:var(--accent);}
+.date-label{font-family:'Syne',sans-serif;font-weight:700;font-size:1.35rem;flex:1;letter-spacing:-0.03em;}
+
+/* ADD TASK */
+.add-task-row{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+.add-task-row input{flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.87rem;outline:none;}
+.add-task-row input:focus{border-color:var(--accent);}
+.add-task-row select{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:9px 7px;border-radius:8px;font-family:'DM Mono',monospace;font-size:0.71rem;outline:none;cursor:pointer;}
+.btn-add{background:var(--accent);color:#0a0f0a;border:none;padding:9px 15px;border-radius:8px;font-family:'Syne',sans-serif;font-weight:700;font-size:0.81rem;cursor:pointer;}
+
+/* TASKS */
+.task-list{display:flex;flex-direction:column;gap:8px;}
+.task-item{display:flex;align-items:center;gap:9px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;position:relative;overflow:hidden;animation:slideIn 0.2s ease;}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+.task-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:99px;}
+.task-item.cat-Study::before{background:var(--study);}
+.task-item.cat-Focus::before{background:var(--focus);}
+.task-item.cat-Health::before{background:var(--health);}
+.task-item.cat-Utility::before{background:var(--utility);}
+
+.task-item.done{background:var(--done-bg);border-color:#1f2a1d;opacity:0.6;}
+.task-item.done .task-text{text-decoration:line-through;color:var(--muted);}
+.task-item.abandoned{border-color:var(--danger); opacity:0.5;}
+
+.check-btn{width:22px;height:22px;border-radius:6px;border:2px solid var(--border);background:transparent;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.75rem; color: var(--text); position: relative; overflow: hidden;}
+.check-btn:hover{border-color:var(--accent);}
+.task-item.done .check-btn{background:var(--accent);border-color:var(--accent);color:#0a0f0a;}
+
+.progress-ring{position:absolute; top:0; left:0; height:100%; width:0%; background:rgba(255,255,255,0.3); pointer-events:none;}
+
+.task-content{flex:1; display:flex; flex-direction:column;}
+.task-text{font-size:0.9rem;font-weight:500;}
+.task-note{font-size:0.75rem; color:var(--muted); font-family:'DM Mono',monospace; margin-top: 2px;}
+
+.badge-row{display:flex; gap:6px; align-items:center;}
+.task-cat-badge, .diff-badge, .xp-chip{font-family:'DM Mono',monospace;font-size:0.65rem;padding:2px 8px;border-radius:99px; flex-shrink: 0;}
+
+.cat-Study{background:#1a2040;color:var(--study);}
+.cat-Focus{background:#10252b;color:var(--focus);}
+.cat-Health{background:var(--accent-dim);color:var(--health);}
+.cat-Utility{background:#1e1030;color:var(--utility);}
+
+.diff-Trivial{background:#1a1a1a;color:#9e9e9e;}
+.diff-Easy{background:#0d2010;color:#7fff6e;}
+.diff-Medium{background:#2a1800;color:#ff8c42;}
+.diff-Hard{background:#2a0a0a;color:#ff5f57;}
+.diff-Nightmare{background:#1a0033;color:#c77dff; border: 1px solid #c77dff;}
+
+.xp-chip{color:var(--muted); border: 1px solid var(--border);}
+
+.action-btns{display:flex; gap: 4px;}
+.btn-icon{background:none; border:1px solid var(--border); color:var(--muted); padding: 4px 8px; border-radius: 6px; cursor:pointer; font-size: 0.75rem; transition: 0.2s;}
+.btn-icon:hover{background:var(--border); color:var(--text);}
+.btn-danger:hover{background:#ff5f5722; color:var(--danger); border-color:var(--danger);}
+
+/* HABITS */
+.habit-card{display:flex; justify-content:space-between; align-items:center; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:8px;}
+.habit-btn{width:32px; height:32px; border-radius:8px; border:none; font-weight:bold; cursor:pointer;}
+.btn-pos{background:#0d2010; color:#7fff6e; border:1px solid #7fff6e;}
+.btn-neg{background:#2a0a0a; color:#ff5f57; border:1px solid #ff5f57;}
+
+/* STATS & GRAVEYARD */
+.stat-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center; margin-bottom: 10px;}
+.stat-num{font-family:'Syne',sans-serif;font-weight:800;font-size:1.8rem;color:var(--accent);line-height:1;}
+.stat-label{font-size:0.75rem;color:var(--muted);font-family:'DM Mono',monospace; margin-top: 5px;}
+
+/* MODALS */
+.modal{display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999; align-items:center; justify-content:center;}
+.modal-content{background:var(--surface); border:1px solid var(--border); padding:20px; border-radius:12px; width:90%; max-width:350px;}
+
+@media(max-width:720px){
+  .main{grid-template-columns:1fr;height:auto;overflow:visible;}
+  .left-panel,.right-panel{border:none;height:auto;}
+  .right-panel{border-top:1px solid var(--border);}
+}
+</style>
 </head>
 <body>
 
-    <header>
-        <div class="stats-row">
-            <div class="level-badge" id="levelDisplay">Lvl 1</div>
-            <div class="title-display" id="titleDisplay">Novice</div>
-        </div>
-        <div class="xp-bar-container">
-            <div class="xp-bar-fill" id="xpBar"></div>
-            <div class="xp-text" id="xpText">0 / 100 XP</div>
-        </div>
-        <div class="streak-row">
-            <span>🔥 Streak: <span id="streakCount">0</span> <span id="streakMultiplier" style="color:var(--secondary)"></span></span>
-            <span>🛡️ Shields: <span id="shieldCount">0</span></span>
-        </div>
-    </header>
+<header>
+  <div class="logo">RPG<span>board</span></div>
+  <div class="sync-dot"></div>
+  <div class="level-bar">
+    <span class="tag-badge" id="titleDisplay">—</span>
+    <span class="level-info">Lv <span id="levelDisplay">1</span></span>
+    <div class="xp-bar-wrap">
+      <div class="xp-bar-bg"><div class="xp-bar-fill" id="xpBar"></div></div>
+      <div class="xp-label" id="xpText">0 / 100 XP</div>
+    </div>
+  </div>
+  <div class="shield-badge">🛡️ <span id="shieldCount">0</span></div>
+</header>
 
-    <nav>
-        <button class="nav-btn active" onclick="switchTab('tasks')">Tasks</button>
-        <button class="nav-btn" onclick="switchTab('habits')">Habits</button>
-        <button class="nav-btn" onclick="switchTab('analytics')">Stats</button>
-        <button class="nav-btn" onclick="switchTab('graveyard')">Graveyard</button>
-        <button class="nav-btn" onclick="switchTab('settings')">Settings</button>
-    </nav>
-
-    <main id="tasks" class="tab-content active">
-        <div class="input-card">
-            <input type="date" id="taskDate" onchange="renderTasks()">
-            <input type="text" id="taskTitle" placeholder="What needs to be done?" autocomplete="off">
-            <input type="text" id="taskNote" placeholder="Notes (Optional)" autocomplete="off">
-            <div style="display: flex; gap: 10px;">
-                <select id="taskCategory">
-                    <option value="Study">Study (Intelligence)</option>
-                    <option value="Focus">Focus (Willpower)</option>
-                    <option value="Health">Health (Vitality)</option>
-                    <option value="Utility">Utility (Others)</option>
-                </select>
-                <select id="taskDifficulty">
-                    <option value="Trivial">Trivial (10 XP)</option>
-                    <option value="Easy">Easy (25 XP)</option>
-                    <option value="Medium">Medium (50 XP)</option>
-                    <option value="Hard">Hard (100 XP)</option>
-                    <option value="Nightmare">Nightmare (250 XP)</option>
-                </select>
-            </div>
-            <div class="checkbox-row">
-                <label><input type="checkbox" id="taskDaily"> Daily Respawn</label>
-                <label><input type="checkbox" id="taskBoss"> 💀 Boss Fight (x5 XP)</label>
-            </div>
-            <button class="btn-primary" onclick="addTask()">Add Task</button>
-        </div>
-        <div id="taskList" class="task-list"></div>
-    </main>
-
-    <main id="habits" class="tab-content">
-        <div class="input-card">
-            <input type="text" id="habitTitle" placeholder="Habit to build or break">
-            <select id="habitCategory">
-                <option value="Focus">Focus</option><option value="Study">Study</option>
-                <option value="Health">Health</option><option value="Utility">Utility</option>
-            </select>
-            <button class="btn-primary" onclick="addHabit()">Add Habit</button>
-        </div>
-        <div id="habitList" class="task-list"></div>
-    </main>
-
-    <main id="analytics" class="tab-content">
-        <div class="input-card">
-            <h3 style="margin-bottom: 10px;">XP Distribution</h3>
-            <canvas id="xpChart" height="200"></canvas>
-        </div>
-        <div class="input-card" id="lifetimeStats"></div>
-    </main>
-
-    <main id="graveyard" class="tab-content">
-        <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 0.85rem;">Reflect on the tasks you abandoned. Honesty fuels growth.</p>
-        <div id="graveyardList" class="task-list"></div>
-    </main>
-
-    <main id="settings" class="tab-content">
-        <div class="input-card">
-            <h3>Data Management</h3>
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 10px 0;">Export your save file before updating versions.</p>
-            <button class="btn-primary" onclick="exportData()" style="margin-bottom: 10px;">Export Save File (.json)</button>
-            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
-            <button class="btn-primary" onclick="document.getElementById('importFile').click()" style="background: var(--utility);">Import Save File</button>
-        </div>
-        <div class="input-card">
-            <h3>Theme</h3>
-            <select id="themeSelect" onchange="changeTheme()">
-                <option value="dark">Standard Dark</option>
-                <option value="abyssal">Abyssal (High Contrast)</option>
-            </select>
-        </div>
-    </main>
-
-    <div id="abandonModal" class="modal">
-        <div class="modal-content">
-            <h3 style="color: var(--error); margin-bottom: 10px;">Abandon Task</h3>
-            <p style="font-size: 0.85rem; margin-bottom: 15px;">Why are you skipping this? Be honest.</p>
-            <input type="text" id="abandonReason" placeholder="Reason...">
-            <div style="display: flex; gap: 10px;">
-                <button class="btn-primary" style="background: var(--text-muted);" onclick="closeModal('abandonModal')">Cancel</button>
-                <button class="btn-primary" style="background: var(--error);" onclick="confirmAbandon()">Abandon</button>
-            </div>
-        </div>
+<div class="main">
+  <div class="left-panel">
+    <div class="status-bar" id="statusBar"></div>
+    
+    <div class="date-nav">
+      <button onclick="changeDay(-1)">‹</button>
+      <div class="date-label" id="dateLabel" style="text-align:center;">Today</div>
+      <button onclick="changeDay(1)">›</button>
     </div>
 
-    <script>
-        // RPG Configuration
-        const XP_VALUES = { 'Trivial': 10, 'Easy': 25, 'Medium': 50, 'Hard': 100, 'Nightmare': 250 };
-        const TITLES = [
-            "Initiate", "Novice", "Apprentice", "Acolyte", "Neophyte", "Journeyman", "Seeker", 
-            "Scholar", "Adept", "Wanderer", "Pathfinder", "Vanguard", "Sentinel", "Guardian",
-            "Knight", "Elite", "Master", "Grandmaster", "Sage", "Oracle", "Luminary", 
-            "Archon", "Paragon", "Legend", "Mythic", "Immortal", "Demigod", "Astral Sovereign"
-        ];
+    <div class="add-task-row">
+      <input type="text" id="taskTitle" placeholder="What is the mission?" onkeydown="if(event.key==='Enter')addTask()"/>
+      <input type="text" id="taskNote" placeholder="Notes (Optional)" style="min-width:100%; margin-top:-6px;"/>
+      <select id="taskCat">
+        <option value="Study">📚 Study</option>
+        <option value="Focus">🧠 Focus</option>
+        <option value="Health">💪 Health</option>
+        <option value="Utility">🔧 Utility</option>
+      </select>
+      <select id="taskDiff">
+        <option value="Trivial">⚪ Trivial</option>
+        <option value="Easy">🟢 Easy</option>
+        <option value="Medium">🟡 Medium</option>
+        <option value="Hard">🔴 Hard</option>
+        <option value="Nightmare">🟣 Nightmare</option>
+      </select>
+      <select id="taskType" style="width:auto;">
+        <option value="once">Once</option>
+        <option value="daily">Daily</option>
+      </select>
+      <button class="btn-add" onclick="addTask()">+ Add</button>
+    </div>
+
+    <div class="task-list" id="taskList"></div>
+  </div>
+
+  <div class="right-panel">
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('tab-stats', this)">Stats</button>
+      <button class="tab-btn" onclick="switchTab('tab-habits', this)">Habits</button>
+      <button class="tab-btn" onclick="switchTab('tab-grave', this)">Graveyard</button>
+      <button class="tab-btn" onclick="switchTab('tab-settings', this)">Settings</button>
+    </div>
+
+    <div id="tab-stats" class="tab-content active">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div class="stat-card"><div class="stat-num" id="statStreak">0</div><div class="stat-label">Daily Streak 🔥</div></div>
+        <div class="stat-card"><div class="stat-num" id="statTotal" style="color:var(--study)">0</div><div class="stat-label">Tasks Done ✓</div></div>
+      </div>
+      <div class="stat-card" style="padding:15px; margin-top:10px;">
+        <canvas id="xpChart" height="220"></canvas>
+      </div>
+    </div>
+
+    <div id="tab-habits" class="tab-content">
+      <div class="add-task-row" style="margin-bottom:10px;">
+        <input type="text" id="habitTitle" placeholder="New Habit..." onkeydown="if(event.key==='Enter')addHabit()"/>
+        <select id="habitCat">
+          <option value="Study">📚</option><option value="Focus">🧠</option>
+          <option value="Health">💪</option><option value="Utility">🔧</option>
+        </select>
+        <button class="btn-add" onclick="addHabit()">+</button>
+      </div>
+      <div id="habitList"></div>
+    </div>
+
+    <div id="tab-grave" class="tab-content">
+      <p style="font-family:'DM Mono',monospace; font-size:0.75rem; color:var(--muted); margin-bottom:10px;">Reflect on abandoned missions.</p>
+      <div class="task-list" id="graveList"></div>
+    </div>
+
+    <div id="tab-settings" class="tab-content">
+      <div class="stat-card" style="text-align:left;">
+        <h4 style="margin-bottom:10px; font-family:'Syne';">Visual Theme</h4>
+        <select id="themeSelect" onchange="changeTheme()" style="width:100%; padding:8px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:6px; font-family:'DM Mono';">
+          <option value="dark">Standard Dark</option>
+          <option value="abyssal">Abyssal (High Contrast)</option>
+          <option value="slime">Isekai / Slime</option>
+        </select>
+      </div>
+      <div class="stat-card" style="text-align:left; margin-top:10px;">
+        <h4 style="margin-bottom:10px; font-family:'Syne';">Data Transfer</h4>
+        <button class="btn-add" style="width:100%; margin-bottom:10px;" onclick="exportData()">Export Save (.json)</button>
+        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(event)">
+        <button class="btn-add" style="width:100%; background:var(--border); color:var(--text);" onclick="document.getElementById('importFile').click()">Import Save</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="abandonModal" class="modal">
+  <div class="modal-content">
+    <h3 style="color:var(--danger); font-family:'Syne'; margin-bottom:10px;">Abandon Mission</h3>
+    <input type="text" id="abandonReason" placeholder="Reason for failing..." style="width:100%; padding:10px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:6px; margin-bottom:15px; font-family:'DM Sans';">
+    <div style="display:flex; gap:10px;">
+      <button class="btn-add" style="flex:1; background:var(--border); color:var(--text);" onclick="document.getElementById('abandonModal').style.display='none'">Cancel</button>
+      <button class="btn-add" style="flex:1; background:var(--danger);" onclick="confirmAbandon()">Abandon</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- SYSTEM CONFIG ---
+const XP_VALS = { 'Trivial': 10, 'Easy': 25, 'Medium': 50, 'Hard': 100, 'Nightmare': 250 };
+const TITLES = ["Initiate", "Novice", "Apprentice", "Acolyte", "Neophyte", "Journeyman", "Seeker", "Scholar", "Adept", "Wanderer", "Pathfinder", "Vanguard", "Sentinel", "Guardian", "Knight", "Elite", "Master", "Grandmaster", "Sage", "Oracle", "Luminary", "Archon", "Paragon", "Legend", "Mythic", "Immortal", "Demigod", "Astral Sovereign"];
+
+// Chart JS Global Text Color Fix
+Chart.defaults.color = '#888888';
+Chart.defaults.font.family = "'DM Mono', monospace";
+
+let state = {
+    xp: 0, level: 1, streak: 0, negativeStreak: 0, shields: 0,
+    tasks: [], habits: [], graveyard: [],
+    stats: { Study: 0, Focus: 0, Health: 0, Utility: 0, TotalTasks: 0 },
+    lastLoginDate: new Date().toISOString().split('T')[0]
+};
+
+let currentDateStr = new Date().toISOString().split('T')[0];
+let currentAbandonId = null;
+let pressTimer;
+let xpChart;
+
+// --- INIT ---
+window.onload = () => {
+    const saved = localStorage.getItem('rpgTrackerState');
+    if (saved) state = JSON.parse(saved);
+    
+    document.getElementById('themeSelect').value = localStorage.getItem('rpgTheme') || 'dark';
+    changeTheme();
+    
+    midnightCheck();
+    updateUI();
+    initChart();
+};
+
+function saveState() {
+    localStorage.setItem('rpgTrackerState', JSON.stringify(state));
+    updateUI();
+}
+
+// --- CORE UI ---
+function updateUI() {
+    const xpReq = getXPReq(state.level);
+    document.getElementById('levelDisplay').innerText = state.level;
+    document.getElementById('titleDisplay').innerText = getTitle(state.level);
+    document.getElementById('xpText').innerText = `${Math.floor(state.xp)} / ${xpReq} XP`;
+    document.getElementById('xpBar').style.width = `${Math.min(100, (state.xp / xpReq) * 100)}%`;
+    document.getElementById('shieldCount').innerText = state.shields;
+    
+    let multi = state.streak > 0 ? (1 + Math.min(state.streak * 0.05, 0.5)).toFixed(2) : 1;
+    let buffText = state.streak > 0 ? `<div class="status-chip" style="background:#0d2010; color:#7fff6e; border-color:#7fff6e55;">🔥 ${multi}x XP Multiplier</div>` : `<div class="status-chip" style="color:var(--muted); border-color:var(--border);">✦ No Buffs Active</div>`;
+    if(state.negativeStreak >= 3) buffText = `<div class="status-chip" style="background:#2a0a0a; color:#ff5f57; border-color:#ff5f5755;">⚠️ XP Penalty Active</div>`;
+    
+    document.getElementById('statusBar').innerHTML = buffText;
+    document.getElementById('statStreak').innerText = state.streak;
+    document.getElementById('statTotal').innerText = state.stats.TotalTasks;
+
+    renderTasks();
+    renderHabits();
+    renderGraveyard();
+    if(xpChart) updateChart();
+}
+
+function getXPReq(lvl) { return Math.floor(100 * Math.pow(1.15, lvl - 1)); }
+
+function getTitle(lvl) {
+    if(lvl <= 10) return TITLES[Math.floor((lvl-1)/1)];
+    if(lvl <= 30) return TITLES[Math.min(10 + Math.floor((lvl-11)/3), 26)];
+    return TITLES[Math.min(17 + Math.floor((lvl-31)/10), 27)];
+}
+
+function switchTab(tabId, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    btn.classList.add('active');
+}
+
+function changeTheme() {
+    const theme = document.getElementById('themeSelect').value;
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('rpgTheme', theme);
+}
+
+// --- DATE NAV ---
+function changeDay(delta) {
+    const p = currentDateStr.split('-').map(Number);
+    const d = new Date(p[0], p[1] - 1, p[2] + delta);
+    currentDateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    if(currentDateStr === todayStr) document.getElementById('dateLabel').innerText = "Today";
+    else document.getElementById('dateLabel').innerText = d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
+    
+    renderTasks();
+}
+
+// --- LOGIC ---
+function addXP(amount, cat) {
+    const multi = state.streak > 0 ? 1 + Math.min(state.streak * 0.05, 0.5) : 1;
+    const finalXP = amount * multi;
+    state.xp += finalXP;
+    if(cat) state.stats[cat] += finalXP;
+    
+    while (state.xp >= getXPReq(state.level)) {
+        state.xp -= getXPReq(state.level);
+        state.level++;
+        state.shields++;
+    }
+    saveState();
+}
+
+function removeXP(amount) {
+    state.xp -= amount;
+    if (state.xp < 0) state.xp = 0;
+    saveState();
+}
+
+// --- TASKS ---
+function addTask() {
+    const title = document.getElementById('taskTitle').value;
+    if(!title) return;
+    const task = {
+        id: Date.now(), date: currentDateStr, title,
+        note: document.getElementById('taskNote').value,
+        cat: document.getElementById('taskCat').value,
+        diff: document.getElementById('taskDiff').value,
+        daily: document.getElementById('taskType').value === 'daily',
+        completed: false, abandoned: false
+    };
+    state.tasks.push(task);
+    document.getElementById('taskTitle').value = '';
+    document.getElementById('taskNote').value = '';
+    saveState();
+}
+
+function renderTasks() {
+    const list = document.getElementById('taskList');
+    const dayTasks = state.tasks.filter(t => t.date === currentDateStr && !t.abandoned);
+    
+    if(dayTasks.length === 0) {
+        list.innerHTML = `<div style="text-align:center; padding:30px; color:var(--muted); font-family:'DM Mono';">No quests logged for this day.</div>`;
+        return;
+    }
+
+    list.innerHTML = dayTasks.map(t => {
+        const xpBase = XP_VALS[t.diff];
+        const isHeavy = t.diff === 'Hard' || t.diff === 'Nightmare';
         
-        // State Management
-        let state = {
-            xp: 0, level: 1, streak: 0, negativeStreak: 0, shields: 0,
-            tasks: [], habits: [], graveyard: [],
-            stats: { Study: 0, Focus: 0, Health: 0, Utility: 0, TotalTasks: 0 },
-            lastLoginDate: new Date().toISOString().split('T')[0]
-        };
-
-        let currentAbandonId = null;
-        let pressTimer;
-
-        // Initialization
-        window.onload = () => {
-            const saved = localStorage.getItem('rpgTrackerState');
-            if (saved) state = JSON.parse(saved);
-            
-            document.getElementById('taskDate').value = new Date().toISOString().split('T')[0];
-            document.getElementById('themeSelect').value = localStorage.getItem('rpgTheme') || 'dark';
-            changeTheme();
-            
-            midnightCheck();
-            updateUI();
-            initChart();
-        };
-
-        function saveState() {
-            localStorage.setItem('rpgTrackerState', JSON.stringify(state));
-            updateUI();
-        }
-
-        // Web Audio Ding
-        function playDing() {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain); gain.connect(ctx.destination);
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(800, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.02);
-            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.15);
-            osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.15);
-        }
-
-        // Core UI
-        function updateUI() {
-            const xpReq = getXPReq(state.level);
-            document.getElementById('levelDisplay').innerText = `Lvl ${state.level}`;
-            document.getElementById('titleDisplay').innerText = getTitle(state.level);
-            document.getElementById('xpText').innerText = `${Math.floor(state.xp)} / ${xpReq} XP`;
-            document.getElementById('xpBar').style.width = `${Math.min(100, (state.xp / xpReq) * 100)}%`;
-            document.getElementById('streakCount').innerText = state.streak;
-            document.getElementById('shieldCount').innerText = state.shields;
-            
-            let multi = state.streak > 0 ? (1 + Math.min(state.streak * 0.05, 0.5)).toFixed(2) : 1;
-            document.getElementById('streakMultiplier').innerText = state.streak > 0 ? `(x${multi})` : '';
-
-            renderTasks();
-            renderHabits();
-            renderGraveyard();
-        }
-
-        function getXPReq(lvl) { return Math.floor(100 * Math.pow(1.15, lvl - 1)); }
-        
-        function getTitle(lvl) {
-            if(lvl <= 10) return TITLES[Math.floor((lvl-1)/1)];
-            if(lvl <= 30) return TITLES[Math.min(10 + Math.floor((lvl-11)/3), 26)];
-            return TITLES[Math.min(17 + Math.floor((lvl-31)/10), 27)];
-        }
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            event.currentTarget.classList.add('active');
-            if(tabId === 'analytics') initChart();
-        }
-
-        function changeTheme() {
-            const theme = document.getElementById('themeSelect').value;
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('rpgTheme', theme);
-        }
-
-        // XP & Leveling Logic
-        function addXP(amount, cat) {
-            const multi = state.streak > 0 ? 1 + Math.min(state.streak * 0.05, 0.5) : 1;
-            const finalXP = amount * multi;
-            state.xp += finalXP;
-            state.stats[cat] += finalXP;
-            
-            while (state.xp >= getXPReq(state.level)) {
-                state.xp -= getXPReq(state.level);
-                state.level++;
-                state.shields++;
-            }
-            saveState();
-        }
-
-        function removeXP(amount) {
-            state.xp -= amount;
-            if (state.xp < 0) state.xp = 0; // Level Floor protection
-            saveState();
-        }
-
-        // Tasks Logic
-        function addTask() {
-            const title = document.getElementById('taskTitle').value;
-            if(!title) return;
-            const task = {
-                id: Date.now(),
-                date: document.getElementById('taskDate').value,
-                title,
-                note: document.getElementById('taskNote').value,
-                cat: document.getElementById('taskCategory').value,
-                diff: document.getElementById('taskDifficulty').value,
-                daily: document.getElementById('taskDaily').checked,
-                boss: document.getElementById('taskBoss').checked,
-                completed: false, abandoned: false
-            };
-            state.tasks.push(task);
-            document.getElementById('taskTitle').value = '';
-            document.getElementById('taskNote').value = '';
-            saveState();
-        }
-
-        function renderTasks() {
-            const list = document.getElementById('taskList');
-            const targetDate = document.getElementById('taskDate').value;
-            list.innerHTML = '';
-            
-            const dayTasks = state.tasks.filter(t => t.date === targetDate && !t.abandoned);
-            
-            dayTasks.forEach(task => {
-                const xpBase = XP_VALUES[task.diff] * (task.boss ? 5 : 1);
-                const isHeavy = task.diff === 'Hard' || task.diff === 'Nightmare';
-                
-                let actionHTML = '';
-                if (task.completed) {
-                    actionHTML = `<button class="action-btn" onclick="undoTask(${task.id}, ${xpBase})">Undo</button>`;
-                } else {
-                    actionHTML = `
-                        <button class="action-btn btn-dismiss" onclick="dismissTask(${task.id})">Dismiss</button>
-                        <button class="action-btn btn-abandon" onclick="openAbandon(${task.id})">Abandon</button>
-                        <button class="action-btn btn-complete" 
-                            ${isHeavy ? `onmousedown="startLongPress(${task.id}, ${xpBase}, '${task.cat}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress(${task.id}, ${xpBase}, '${task.cat}')" ontouchend="cancelLongPress()"` : `onclick="completeTask(${task.id}, ${xpBase}, '${task.cat}')"`}>
-                            <div class="progress-ring" id="ring-${task.id}"></div>
-                            Check
-                        </button>`;
-                }
-
-                list.innerHTML += `
-                    <div class="task-card ${task.completed ? 'completed' : ''}" style="border-color: var(--${task.cat.toLowerCase()})">
-                        <div class="task-info">
-                            <div class="task-title">${task.title}</div>
-                            ${task.note ? `<div class="task-note">${task.note}</div>` : ''}
-                            <div class="task-meta">
-                                <span class="cat-${task.cat.toLowerCase()}">${task.cat}</span> | 
-                                <span>${task.diff} ${task.boss ? '(BOSS)' : ''}</span> | 
-                                <span>${xpBase} XP</span>
-                            </div>
-                        </div>
-                        <div class="actions">${actionHTML}</div>
-                    </div>`;
-            });
-        }
-
-        function completeTask(id, xpBase, cat) {
-            const task = state.tasks.find(t => t.id === id);
-            task.completed = true;
-            state.stats.TotalTasks++;
-            addXP(xpBase, cat);
-            playDing();
-            checkDailyCompletion(task.date);
-        }
-
-        function undoTask(id, xpBase) {
-            const task = state.tasks.find(t => t.id === id);
-            task.completed = false;
-            state.stats.TotalTasks--;
-            removeXP(xpBase);
-        }
-
-        function dismissTask(id) {
-            state.tasks = state.tasks.filter(t => t.id !== id);
-            saveState();
-        }
-
-        // Long Press Mechanic
-        function startLongPress(id, xpBase, cat) {
-            const ring = document.getElementById(`ring-${id}`);
-            ring.style.transition = 'width 3s linear';
-            ring.style.width = '100%';
-            pressTimer = setTimeout(() => { completeTask(id, xpBase, cat); }, 3000);
-        }
-        function cancelLongPress() {
-            clearTimeout(pressTimer);
-            document.querySelectorAll('.progress-ring').forEach(r => {
-                r.style.transition = 'none'; r.style.width = '0%';
-            });
-        }
-
-        // Abandon System
-        function openAbandon(id) {
-            currentAbandonId = id;
-            document.getElementById('abandonReason').value = '';
-            document.getElementById('abandonModal').style.display = 'flex';
-        }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-        function confirmAbandon() {
-            const reason = document.getElementById('abandonReason').value || 'No reason provided.';
-            const task = state.tasks.find(t => t.id === currentAbandonId);
-            task.abandoned = true;
-            state.graveyard.push({ ...task, reason, abandonedDate: new Date().toISOString().split('T')[0] });
-            closeModal('abandonModal');
-            saveState();
-        }
-
-        function renderGraveyard() {
-            const list = document.getElementById('graveyardList');
-            list.innerHTML = state.graveyard.slice().reverse().map(t => `
-                <div class="task-card abandoned">
-                    <div class="task-info">
-                        <div class="task-title" style="color:var(--error)">${t.title}</div>
-                        <div class="task-note">"${t.reason}"</div>
-                        <div class="task-meta">${t.abandonedDate} | ${t.cat}</div>
-                    </div>
-                </div>`).join('');
-        }
-
-        // Habits System
-        function addHabit() {
-            const title = document.getElementById('habitTitle').value;
-            if(!title) return;
-            state.habits.push({ id: Date.now(), title, cat: document.getElementById('habitCategory').value, streak: 0 });
-            document.getElementById('habitTitle').value = '';
-            saveState();
-        }
-        
-        function renderHabits() {
-            const list = document.getElementById('habitList');
-            list.innerHTML = state.habits.map(h => `
-                <div class="habit-card" style="border-left: 4px solid var(--${h.cat.toLowerCase()})">
-                    <div>
-                        <div class="task-title">${h.title}</div>
-                        <div class="task-meta">Streak: ${h.streak} | ${h.cat}</div>
-                    </div>
-                    <div class="habit-actions">
-                        <button class="btn-pos" onclick="habitAction(${h.id}, true)">+</button>
-                        <button class="btn-neg" onclick="habitAction(${h.id}, false)">-</button>
-                    </div>
-                </div>`).join('');
-        }
-
-        function habitAction(id, isPos) {
-            if(!confirm(`Are you sure you want to mark this habit as ${isPos ? 'Positive' : 'Negative'}?`)) return;
-            const habit = state.habits.find(h => h.id === id);
-            if(isPos) {
-                habit.streak++;
-                addXP(15, habit.cat);
-                playDing();
-            } else {
-                habit.streak = 0;
-                removeXP(50); // Moderate penalty
-            }
-            saveState();
-        }
-
-        // Midnight & Streak Logic
-        function checkDailyCompletion(dateStr) {
-            const dayTasks = state.tasks.filter(t => t.date === dateStr && !t.abandoned);
-            if(dayTasks.length > 0 && dayTasks.every(t => t.completed)) {
-                if(dateStr === new Date().toISOString().split('T')[0]) {
-                    state.streak++;
-                    state.negativeStreak = 0;
-                    saveState();
-                }
-            }
-        }
-
-        function midnightCheck() {
-            const today = new Date().toISOString().split('T')[0];
-            if (state.lastLoginDate !== today) {
-                // Determine if yesterday was completed
-                const yTasks = state.tasks.filter(t => t.date === state.lastLoginDate && !t.abandoned);
-                const failed = yTasks.some(t => !t.completed);
-                
-                if (failed) {
-                    if (state.streak >= 5 && state.shields > 0) {
-                        if(confirm(`Your ${state.streak}-day streak broke yesterday! Use 1 Shield to save it?`)) {
-                            state.shields--;
-                        } else { applyStreakBreak(); }
-                    } else { applyStreakBreak(); }
-                }
-
-                // Respawn Dailies
-                state.tasks.filter(t => t.daily).forEach(t => {
-                    if (!state.tasks.find(nt => nt.title === t.title && nt.date === today)) {
-                        state.tasks.push({ ...t, id: Date.now() + Math.random(), date: today, completed: false, abandoned: false });
-                    }
-                });
-                
-                state.lastLoginDate = today;
-                saveState();
-            }
-        }
-
-        function applyStreakBreak() {
-            state.streak = 0;
-            state.negativeStreak++;
-            if(state.negativeStreak >= 3) {
-                // Apply flat penalty for unfinished heavy tasks
-                const yTasks = state.tasks.filter(t => t.date === state.lastLoginDate && !t.completed && !t.abandoned);
-                yTasks.forEach(t => removeXP(XP_VALUES[t.diff] * 0.5));
-            }
-        }
-
-        // Data Management
-        function exportData() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", `rpg_tracker_v1_${new Date().getTime()}.json`);
-            dlAnchorElem.click();
-        }
-
-        function importData(event) {
-            const file = event.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                state = JSON.parse(e.target.result);
-                saveState();
-                alert("Data imported successfully!");
-            };
-            reader.readAsText(file);
-        }
-
-        // Analytics (Chart.js)
-        let xpChart;
-        function initChart() {
-            document.getElementById('lifetimeStats').innerHTML = `
-                <h3>Lifetime Mastery</h3>
-                <p>Total Tasks Crushed: <strong>${state.stats.TotalTasks}</strong></p>
+        let btns = '';
+        if(t.completed) {
+            btns = `<button class="btn-icon" onclick="undoTask(${t.id}, ${xpBase})">Undo</button>`;
+        } else {
+            btns = `
+                <button class="btn-icon" onclick="dismissTask(${t.id})">Dismiss</button>
+                <button class="btn-icon btn-danger" onclick="openAbandon(${t.id})">Abandon</button>
             `;
-            const ctx = document.getElementById('xpChart').getContext('2d');
-            if(xpChart) xpChart.destroy();
-            xpChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Intelligence (Study)', 'Willpower (Focus)', 'Vitality (Health)', 'Utility'],
-                    datasets: [{
-                        data: [state.stats.Study, state.stats.Focus, state.stats.Health, state.stats.Utility],
-                        backgroundColor: ['#ff9800', '#2196f3', '#4caf50', '#9e9e9e'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { plugins: { legend: { position: 'bottom', labels: { color: 'var(--text)' } } } }
-            });
         }
-    </script>
+
+        const checkHTML = t.completed ? '✓' : `<div class="progress-ring" id="ring-${t.id}"></div>`;
+        const actionHTML = t.completed ? `onclick="undoTask(${t.id}, ${xpBase})"` : 
+            (isHeavy ? `onmousedown="startPress(${t.id}, ${xpBase}, '${t.cat}')" onmouseup="cancelPress()" onmouseleave="cancelPress()" ontouchstart="startPress(${t.id}, ${xpBase}, '${t.cat}')" ontouchend="cancelPress()"` : `onclick="completeTask(${t.id}, ${xpBase}, '${t.cat}')"`);
+
+        return `
+            <div class="task-item cat-${t.cat} ${t.completed ? 'done' : ''}">
+                <button class="check-btn" ${actionHTML}>${checkHTML}</button>
+                <div class="task-content">
+                    <div class="task-text">${t.title}</div>
+                    ${t.note ? `<div class="task-note">${t.note}</div>` : ''}
+                    <div class="badge-row" style="margin-top:6px;">
+                        <span class="task-cat-badge cat-${t.cat}">${t.cat}</span>
+                        <span class="diff-badge diff-${t.diff}">${t.diff}</span>
+                        <span class="xp-chip">${xpBase} XP</span>
+                        ${t.daily ? `<span class="xp-chip" style="border:none;">🔄</span>` : ''}
+                    </div>
+                </div>
+                <div class="action-btns">${btns}</div>
+            </div>`;
+    }).join('');
+}
+
+function completeTask(id, xpBase, cat) {
+    const task = state.tasks.find(t => t.id === id);
+    task.completed = true;
+    state.stats.TotalTasks++;
+    addXP(xpBase, cat);
+    checkDailyCompletion(task.date);
+}
+
+function undoTask(id, xpBase) {
+    const task = state.tasks.find(t => t.id === id);
+    task.completed = false;
+    state.stats.TotalTasks--;
+    removeXP(xpBase);
+}
+
+function dismissTask(id) {
+    state.tasks = state.tasks.filter(t => t.id !== id);
+    saveState();
+}
+
+function startPress(id, xpBase, cat) {
+    const ring = document.getElementById(`ring-${id}`);
+    ring.style.transition = 'width 3s linear';
+    ring.style.width = '100%';
+    pressTimer = setTimeout(() => { completeTask(id, xpBase, cat); }, 3000);
+}
+function cancelPress() {
+    clearTimeout(pressTimer);
+    document.querySelectorAll('.progress-ring').forEach(r => {
+        r.style.transition = 'none'; r.style.width = '0%';
+    });
+}
+
+function openAbandon(id) {
+    currentAbandonId = id;
+    document.getElementById('abandonReason').value = '';
+    document.getElementById('abandonModal').style.display = 'flex';
+}
+
+function confirmAbandon() {
+    const reason = document.getElementById('abandonReason').value || 'Skipped.';
+    const task = state.tasks.find(t => t.id === currentAbandonId);
+    task.abandoned = true;
+    state.graveyard.push({ ...task, reason, date: currentDateStr });
+    document.getElementById('abandonModal').style.display = 'none';
+    saveState();
+}
+
+function renderGraveyard() {
+    document.getElementById('graveList').innerHTML = state.graveyard.slice().reverse().map(t => `
+        <div class="task-item abandoned cat-${t.cat}">
+            <div class="task-content">
+                <div class="task-text" style="color:var(--danger)">${t.title}</div>
+                <div class="task-note">"${t.reason}" - ${t.date}</div>
+            </div>
+        </div>`).join('');
+}
+
+// --- HABITS ---
+function addHabit() {
+    const title = document.getElementById('habitTitle').value;
+    if(!title) return;
+    state.habits.push({ id: Date.now(), title, cat: document.getElementById('habitCat').value, streak: 0 });
+    document.getElementById('habitTitle').value = '';
+    saveState();
+}
+
+function renderHabits() {
+    document.getElementById('habitList').innerHTML = state.habits.map(h => `
+        <div class="habit-card" style="border-left: 4px solid var(--${h.cat.toLowerCase()})">
+            <div>
+                <div style="font-weight:bold; font-size:0.9rem;">${h.title} <span style="font-size:0.7rem; color:var(--muted)">[${h.cat}]</span></div>
+                <div style="font-size:0.8rem; font-family:'DM Mono'; color:var(--muted); margin-top:4px;">Streak: ${h.streak}</div>
+            </div>
+            <div style="display:flex; gap:6px;">
+                <button class="habit-btn btn-pos" onclick="habitAct(${h.id}, true)">+</button>
+                <button class="habit-btn btn-neg" onclick="habitAct(${h.id}, false)">-</button>
+            </div>
+        </div>`).join('');
+}
+
+function habitAct(id, isPos) {
+    if(!confirm(`Mark this habit as ${isPos ? 'Maintained' : 'Broken'}?`)) return;
+    const habit = state.habits.find(h => h.id === id);
+    if(isPos) { habit.streak++; addXP(15, habit.cat); }
+    else { habit.streak = 0; removeXP(50); }
+    saveState();
+}
+
+// --- MIDNIGHT LOGIC ---
+function checkDailyCompletion(dateStr) {
+    const dayTasks = state.tasks.filter(t => t.date === dateStr && !t.abandoned);
+    if(dayTasks.length > 0 && dayTasks.every(t => t.completed)) {
+        if(dateStr === new Date().toISOString().split('T')[0]) {
+            state.streak++; state.negativeStreak = 0; saveState();
+        }
+    }
+}
+
+function midnightCheck() {
+    const today = new Date().toISOString().split('T')[0];
+    if (state.lastLoginDate !== today) {
+        const yTasks = state.tasks.filter(t => t.date === state.lastLoginDate && !t.abandoned);
+        if (yTasks.some(t => !t.completed)) {
+            if (state.streak >= 5 && state.shields > 0) {
+                if(confirm(`Your streak broke! Burn 1 Shield to save it?`)) state.shields--;
+                else applyStreakBreak();
+            } else applyStreakBreak();
+        }
+
+        // Daily Respawn
+        state.tasks.filter(t => t.daily).forEach(t => {
+            if (!state.tasks.find(nt => nt.title === t.title && nt.date === today)) {
+                state.tasks.push({ ...t, id: Date.now() + Math.random(), date: today, completed: false, abandoned: false });
+            }
+        });
+        
+        state.lastLoginDate = today; saveState();
+    }
+}
+
+function applyStreakBreak() {
+    state.streak = 0; state.negativeStreak++;
+    if(state.negativeStreak >= 3) {
+        state.tasks.filter(t => t.date === state.lastLoginDate && !t.completed && !t.abandoned)
+            .forEach(t => removeXP(XP_VALS[t.diff] * 0.5));
+    }
+}
+
+// --- CHARTS & DATA ---
+function initChart() {
+    const ctx = document.getElementById('xpChart').getContext('2d');
+    xpChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Study', 'Focus', 'Health', 'Utility'],
+            datasets: [{
+                data: [state.stats.Study, state.stats.Focus, state.stats.Health, state.stats.Utility],
+                backgroundColor: ['#6c8fff', '#4dd0e1', '#7fff6e', '#c77dff'],
+                borderWidth: 0, hoverOffset: 4
+            }]
+        },
+        options: { plugins: { legend: { position: 'bottom' } }, layout: { padding: 10 } }
+    });
+}
+
+function updateChart() {
+    xpChart.data.datasets[0].data = [state.stats.Study, state.stats.Focus, state.stats.Health, state.stats.Utility];
+    xpChart.update();
+}
+
+function exportData() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+    const a = document.createElement('a');
+    a.href = dataStr; a.download = `rpg_save_${new Date().getTime()}.json`; a.click();
+}
+
+function importData(e) {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => { state = JSON.parse(e.target.result); saveState(); alert("Save Loaded!"); };
+    reader.readAsText(file);
+}
+</script>
 </body>
 </html>
