@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Dark app icon background with rounded corners -->
+  <rect width="512" height="512" rx="112" fill="#0a0014" />
+  
+  <!-- Minimalist Purple Aura -->
+  <circle cx="256" cy="256" r="160" fill="#3d007a" opacity="0.8" filter="blur(12px)" />
+  
+  <!-- Clean Black Silhouette -->
+  <path d="M 128 512 C 128 300, 384 300, 384 512 Z" fill="#000000" />
+  
+  <!-- Glowing Red Eyes -->
+  <ellipse cx="216" cy="280" rx="20" ry="8" fill="#ff0000" transform="rotate(10 216 280)" />
+  <ellipse cx="296" cy="280" rx="20" ry="8" fill="#ff0000" transform="rotate(-10 296 280)" />
+  
+  <!-- White Pupils for intensity -->
+  <circle cx="216" cy="280" r="4" fill="#ffffff" />
+  <circle cx="296" cy="280" r="4" fill="#ffffff" />
+</svg>
+
